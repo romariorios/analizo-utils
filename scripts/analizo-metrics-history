@@ -4,16 +4,14 @@
 # Antônio Terceiro (terceiro@dcc.ufba.br)
 # Luiz Romário Santana Rios (luizromario@gmail.com)
 # 
-# Usage: ./metrics-history directory
-#
-# WARNING NOTE: Do not run this script in a work folder, since it 
-# will checkout every commit in history, which may destroy your
-# ongoing work.
+# Usage: ./metrics-history repository-url
 #
 require 'rubygems'
 require 'grit'
 require 'yaml'
 require 'benchmark'
+require 'ftools'
+require 'fileutils'
 
 FILTER = /\.(c|h|cpp|cxx|cc|hpp|java)$/
 
@@ -84,62 +82,77 @@ class AnalizoRunner
     end
   end
 end
-
+previous_dir = Dir.pwd
+Dir.chdir("/tmp")
 if !ARGV[0] then
-  puts "Usage: #{$PROGRAM_NAME} directory"
+  puts "Usage: #{$PROGRAM_NAME} repository-url"
   exit
 end
+puts "Downloading the project..."
 begin
-  tree = Grit::Repo.new(ARGV[0]).commits.first
+  if "" != git_dir = `git clone #{ARGV[0]}`
+    tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
+  else
+    exit
+  end
 rescue Grit::InvalidGitRepositoryError
   puts "Fatal: Not a git repository."
   exit
 end
-previous_directory = Dir.pwd
-Dir.chdir(ARGV[0])
-system("echo \"Log opened at: #{Time.now}\" >> git.log")
-system("echo \"Log opened at: #{Time.now}\" >> analizo.log")
-system("echo \"Log opened at: #{Time.now}\" >> doxyparse.log")
-system("git checkout master > /dev/null 2>> git.log")
-
-File.open('metrics.csv', 'w') do |file|
-  file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_lcom4,number_of_functions,number_of_modules,number_of_public_functions,total_loc,changed_files,date\n"
-  wl = tree.wanted_list
-  if wl.size == 0 then
-    puts "No relevant commits to proccess"
-  else
-    print "Processing " 
-    if wl.size == 1 then
-      puts "one commit"
-    else
-      puts "#{wl.size} commits..."
-    end
-  end
-  error_counter = 0
-  wl.each do |commit|
-    if mcsv = AnalizoRunner.metricsCSV(commit) then
-      file.puts mcsv
-      print "."
-    else
-      print "E"
-      system("analizo-metrics . >> analizo.log 2>> analizo.log")
-      system("doxyparse . >> doxyparse.log 2>> doxyparse.log")
-      error_counter +=1
-    end
-  end
-  if error_counter == 0 then
-    puts "\nDone.\n"
-  else
-    if error_counter == 1 then
-      print "\nOne error"
-    else
-      print "\n#{error_counter} errors"
-    end
-    puts " ocurred. Check analizo.log and git.log for more details.\n"
-  end
+puts "Done."
+proj_name = git_dir.split("/")[-3]
+Dir.chdir(git_dir) do
+  system("echo \"Log opened at: #{Time.now}\" >> git.log")
+  system("echo \"Log opened at: #{Time.now}\" >> analizo.log")
+  system("echo \"Log opened at: #{Time.now}\" >> doxyparse.log")
   system("git checkout master > /dev/null 2>> git.log")
-end
 
-system("echo \"Log closed at: #{Time.now}\" >> git.log")
-system("echo \"Log closed at: #{Time.now}\" >> analizo.log")
-system("echo \"Log closed at: #{Time.now}\" >> doxyparse.log")
+  File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
+    file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_lcom4,number_of_functions,number_of_modules,number_of_public_functions,total_loc,changed_files,date\n"
+    wl = tree.wanted_list
+    if wl.size == 0 then
+      puts "No relevant commits to proccess"
+    else
+      print "Processing " 
+      if wl.size == 1 then
+        puts "one commit"
+      else
+        puts "#{wl.size} commits..."
+      end
+    end
+    error_counter = 0
+    wl.each do |commit|
+      if mcsv = AnalizoRunner.metricsCSV(commit) then
+        file.puts mcsv
+        print "."
+      else
+        print "E"
+        system("echo \"Error processing commit #{commit}.\"")
+        system("echo \"Analizo out:\"")
+        system("analizo-metrics . >> analizo.log 2>> analizo.log")
+        system("echo \"Doxyparse out:\"")
+        system("doxyparse . >> doxyparse.log 2>> doxyparse.log")
+        error_counter +=1
+      end
+    end
+    if error_counter == 0 then
+      puts "\nDone.\n"
+    else
+      if error_counter == 1 then
+        print "\nOne error"
+      else
+        print "\n#{error_counter} errors"
+      end
+      puts " ocurred. Check analizo.log and doxyparse.log for more details.\n"
+    end
+    system("git checkout master > /dev/null 2>> git.log")
+  end
+  system("echo \"Log closed at: #{Time.now}\" >> git.log")
+  system("echo \"Log closed at: #{Time.now}\" >> analizo.log")
+  system("echo \"Log closed at: #{Time.now}\" >> doxyparse.log")
+  Dir.mkdir(logs_dir = previous_dir+"/#{time_start_str}-#{proj_name}-logs")
+  File.move("git.log", logs_dir)
+  File.move("analizo.log", logs_dir)
+  File.move("doxyparse.log", logs_dir)
+end
+FileUtils.rm_r(proj_name, :force => true)
