@@ -4,7 +4,8 @@
 # Antônio Terceiro (terceiro@dcc.ufba.br)
 # Luiz Romário Santana Rios (luizromario@gmail.com)
 # 
-# Usage: ./metrics-history repository-url
+# Usage: metrics-history repository-url
+#        metrics-history -f repository-folder
 #
 require 'rubygems'
 require 'grit'
@@ -82,24 +83,79 @@ class AnalizoRunner
     end
   end
 end
-previous_dir = Dir.pwd
-Dir.chdir("/tmp")
-if !ARGV[0] then
-  puts "Usage: #{$PROGRAM_NAME} repository-url"
+
+class Message
+  def self.done
+    puts "Done."
+  end
+  def self.donwloading
+    puts "Downloading the project..."
+  end
+  def self.fatal(msg)
+    puts "Fatal: #{msg}"
+  end
+  def self.not_implemented(feature = "feature")
+    print "Sorry, #{feature} not implemented yet."
+  end
+  def self.usage
+    puts "Usage:\n   #{$PROGRAM_NAME} repository-url\n   #{$PROGRAM_NAME} -f repository-folder"
+  end
+end
+
+options = {}
+
+argv = ARGV
+argv.each_index do |i|
+  supported_version_control_systems = [
+  # [long_option, short_option]
+    ["--svn", "-s"],
+    ["--cvs", "-c"]
+  ]
+  if (ai = argv[i])[0] != "-" and argv[i-1] != "-f" and !options.has_key?(:folder) and !options.has_key?(:url)
+    options[:url] = argv[i]
+  elsif ("-f" == ai or "--folder" == ai) and !options.has_key?(:folder)  and !options.has_key?(:url)
+    options[:folder] = argv[i+1]
+  else
+    supported_version_control_systems.each do |vcs|
+      if (ai == vcs[0] or ai == vcs[1]) and options.has_key?(:version_control)
+	options[:version_control] = ai[2..-1]
+      end
+    end
+  end
+end
+
+if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) or !options.has_key?(:url))
+  Message.usage
   exit
 end
-puts "Downloading the project..."
+if options.has_key?(:version_control)
+  Message.not_implemented("#{options[:version_control]} support")
+  exit
+end
+
+previous_dir = Dir.pwd
 begin
-  if "" != git_dir = `git clone #{ARGV[0]}`
-    tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
-  else
-    exit
+  if options.has_key?(:url)
+    Dir.chdir("/tmp")
+    Message.downloading
+    if "" != git_dir = `git clone #{options[:url]}`
+      tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
+    else
+      exit
+    end
+    Message.done
+  elsif options.has_key?(:folder)
+    proj_name = ""
+    Dir.chdir(git_dir = previous_dir+options[:folder]) do
+      proj_name = Dir.pwd.split("/")[-1]
+    end
+    FileUtils.cp_r(git_dir, "/tmp")
+    tree = Grit::Repo.new(git_dir = "/tmp/#{proj_name}").commits.first
   end
 rescue Grit::InvalidGitRepositoryError
-  puts "Fatal: Not a git repository."
+  Message.fatal("Not a git repository.")
   exit
 end
-puts "Done."
 proj_name = git_dir.split("/")[-3]
 Dir.chdir(git_dir) do
   system("echo \"Log opened at: #{Time.now}\" >> git.log")
