@@ -68,8 +68,7 @@ class AnalizoRunner
     if metr then
       csv_string = ""
       csv_string << commit.id; csv_string << ","
-      pa = commit.previous_wanted
-      if pa then
+      if pa = commit.previous_wanted then
         csv_string << commit.previous_wanted.id
       end
       csv_string << ","
@@ -110,7 +109,7 @@ argv.each_index do |i|
     ["--svn", "-s"],
     ["--cvs", "-c"]
   ]
-  if (ai = argv[i])[0] != "-" and argv[i-1] != "-f" and !options.has_key?(:folder) and !options.has_key?(:url)
+  if (ai = argv[i])[0..0] != "-" and argv[i-1] != "-f" and !options.has_key?(:folder) and !options.has_key?(:url)
     options[:url] = argv[i]
   elsif ("-f" == ai or "--folder" == ai) and !options.has_key?(:folder)  and !options.has_key?(:url)
     options[:folder] = argv[i+1]
@@ -133,9 +132,9 @@ if options.has_key?(:version_control)
 end
 
 previous_dir = Dir.pwd
+Dir.chdir("/tmp")
 begin
   if options.has_key?(:url)
-    Dir.chdir("/tmp")
     Message.downloading
     if "" != git_dir = `git clone #{options[:url]}`
       tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
@@ -164,7 +163,7 @@ Dir.chdir(git_dir) do
   system("git checkout master > /dev/null 2>> git.log")
 
   File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
-    file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_lcom4,number_of_functions,number_of_modules,number_of_public_functions,total_loc,changed_files,date\n"
+    file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
     wl = tree.wanted_list
     if wl.size == 0 then
       puts "No relevant commits to proccess"
