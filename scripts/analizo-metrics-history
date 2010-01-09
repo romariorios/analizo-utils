@@ -11,7 +11,6 @@ require 'rubygems'
 require 'grit'
 require 'yaml'
 require 'benchmark'
-require 'ftools'
 require 'fileutils'
 
 FILTER = /\.(c|h|cpp|cxx|cc|hpp|java)$/
@@ -88,11 +87,11 @@ class Message
   def self.done
     puts "Done."
   end
-  def self.donwloading
+  def self.downloading
     puts "Downloading the project..."
   end
   def self.fatal(msg)
-    puts "Fatal: #{msg}"
+    puts "fatal: #{msg}"
   end
   def self.not_implemented(feature = "feature")
     print "Sorry, #{feature} not implemented yet."
@@ -124,7 +123,7 @@ argv.each_index do |i|
   end
 end
 
-if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) or !options.has_key?(:url))
+if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) and !options.has_key?(:url))
   Message.usage
   exit
 end
@@ -143,20 +142,21 @@ begin
     else
       exit
     end
+    proj_name = git_dir.split("/")[-3]
     Message.done
   elsif options.has_key?(:folder)
-    proj_name = ""
-    Dir.chdir(git_dir = previous_dir+options[:folder]) do
-      proj_name = Dir.pwd.split("/")[-1]
+    proj_name = Dir.chdir(git_dir = previous_dir+"/"+options[:folder]) do
+      Dir.pwd.split("/")[-1]
     end
-    FileUtils.cp_r(git_dir, "/tmp")
+    FileUtils.cp_r git_dir, "/tmp/#{proj_name}"
     tree = Grit::Repo.new(git_dir = "/tmp/#{proj_name}").commits.first
   end
 rescue Grit::InvalidGitRepositoryError
   Message.fatal("Not a git repository.")
   exit
+rescue Grit::NoSuchPathError
+  Message.fatal("The temporary folder couldn't be created.")
 end
-proj_name = git_dir.split("/")[-3]
 Dir.chdir(git_dir) do
   system("echo \"Log opened at: #{Time.now}\" >> git.log")
   system("echo \"Log opened at: #{Time.now}\" >> analizo.log")
@@ -183,10 +183,11 @@ Dir.chdir(git_dir) do
         print "."
       else
         print "E"
-        system("echo \"Error processing commit #{commit}.\"")
-        system("echo \"Analizo out:\"")
+        system("echo \"Error processing commit #{commit}.\" >> analizo.log 2>> analizo.log")
+        system("echo \"Analizo out:\" >> analizo.log 2>> analizo.log")
         system("analizo-metrics . >> analizo.log 2>> analizo.log")
-        system("echo \"Doxyparse out:\"")
+	system("echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log")
+        system("echo \"Doxyparse out:\" >> doxyparse.log 2>> doxyparse.log")
         system("doxyparse . >> doxyparse.log 2>> doxyparse.log")
         error_counter +=1
       end
@@ -207,8 +208,8 @@ Dir.chdir(git_dir) do
   system("echo \"Log closed at: #{Time.now}\" >> analizo.log")
   system("echo \"Log closed at: #{Time.now}\" >> doxyparse.log")
   Dir.mkdir(logs_dir = previous_dir+"/#{time_start_str}-#{proj_name}-logs")
-  File.move("git.log", logs_dir)
-  File.move("analizo.log", logs_dir)
-  File.move("doxyparse.log", logs_dir)
+  FileUtils.cp("git.log", logs_dir)
+  FileUtils.cp("analizo.log", logs_dir)
+  FileUtils.cp("doxyparse.log", logs_dir)
 end
 FileUtils.rm_r(proj_name, :force => true)
