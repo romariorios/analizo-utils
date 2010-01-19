@@ -100,34 +100,59 @@ class Message
   end
 end
 
-options = {}
-
-argv = ARGV
-argv.each_index do |i|
-  supported_version_control_systems = [
-  # [long_option, short_option]
-    ["--svn", "-s"],
-    ["--cvs", "-c"]
-  ]
-  if (ai = argv[i])[0..0] != "-" and argv[i-1] != "-f" and !options.has_key?(:folder) and !options.has_key?(:url)
-    options[:url] = argv[i]
-  elsif ("-f" == ai or "--folder" == ai) and !options.has_key?(:folder)  and !options.has_key?(:url)
-    options[:folder] = argv[i+1]
-  else
-    supported_version_control_systems.each do |vcs|
-      if (ai == vcs[0] or ai == vcs[1]) and options.has_key?(:version_control)
-	options[:version_control] = ai[2..-1]
+class Options < Hash
+  def initialize(args = [])
+    parse_by_command_line_args(args)
+  end
+  def parse_by_command_line_args(args)
+    args.each_index do |i|
+      version_control_systems = [
+      # [long_option, short_option]
+	["--svn", "-s"],
+	["--cvs", "-c"]
+      ]
+      if (ai = args[i])[0..0] != "-" and args[i-1] != "-f" and !self.has_key?(:folder) and !self.has_key?(:url)
+	self[:url] = args[i]
+      elsif ("-f" == ai or "--folder" == ai) and !self.has_key?(:folder)  and !self.has_key?(:url)
+	self[:folder] = args[i+1]
+      else
+	version_control_systems.each do |vcs|
+	  if (ai == vcs[0] or ai == vcs[1]) and !self.has_key?(:version_control)
+	    self[:version_control] = vcs[0][2..-1]
+	  end
+	end
       end
     end
   end
 end
 
+class VersionControl
+  def self.clone(url, version_control = nil)
+    if "svn" == version_control
+      `git svn clone #{url}`
+    else
+      `git clone #{url}`
+    end
+  end
+end
+
+options = Options.new(ARGV)
+supported_version_control_systems = [
+#   "svn" # Not ready yet.
+]
+
 if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) and !options.has_key?(:url))
   Message.usage
   exit
 end
+
+# Check for inconsistancies
 if options.has_key?(:version_control)
-  Message.not_implemented("#{options[:version_control]} support")
+  if !supported_version_control_systems.include?(o_vc = options[:version_control])
+    Message.not_implemented("#{o_vc} support")
+  elsif options.has_key?(:folder)
+    Message.usage
+  end
   exit
 end
 
@@ -136,7 +161,7 @@ Dir.chdir("/tmp")
 begin
   if options.has_key?(:url)
     Message.downloading
-    if "" != git_dir = `git clone #{options[:url]}`
+    if "" != git_dir = VersionControl.clone(options[:url], options[:version_control])
       tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
     else
       exit
