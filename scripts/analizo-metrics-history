@@ -90,13 +90,16 @@ class Message
     puts "Downloading the project..."
   end
   def self.fatal(msg)
-    puts "fatal: #{msg}"
+    puts "Fatal: #{msg}"
   end
   def self.not_implemented(feature = "feature")
     print "Sorry, #{feature} not implemented yet."
   end
   def self.usage
-    puts "Usage:\n   #{$PROGRAM_NAME} repository-url\n   #{$PROGRAM_NAME} -f repository-folder"
+    puts "Usage:\n   #{$PROGRAM_NAME} repository-url\n   #{$PROGRAM_NAME} -f repository-folder\n   Command-line options:\n     -s or --svn : The url passed is a Subversion repository.\n     -k or --keeptmp : Keep the temporary folder used to take the metrics (recommended for --svn)."
+  end
+  def self.warning(msg)
+    puts "Warning: #{msg}"
   end
 end
 
@@ -105,22 +108,24 @@ class Options < Hash
     parse_by_command_line_args(args)
   end
   def parse_by_command_line_args(args)
-    args.each_index do |i|
-      version_control_systems = [
+    version_control_systems = [
       # [long_option, short_option]
-	["--svn", "-s"],
-	["--cvs", "-c"]
+        ["--svn", "-s"],
+        ["--cvs", "-c"]
       ]
+    args.each_index do |i|
       if (ai = args[i])[0..0] != "-" and args[i-1] != "-f" and !self.has_key?(:folder) and !self.has_key?(:url)
-	self[:url] = args[i]
+        self[:url] = args[i]
       elsif ("-f" == ai or "--folder" == ai) and !self.has_key?(:folder)  and !self.has_key?(:url)
-	self[:folder] = args[i+1]
+        self[:folder] = args[i+1]
+      elsif "-k" == ai or "--keeptmp" == ai
+        self[:keep_temporary_folder] = true
       else
-	version_control_systems.each do |vcs|
-	  if (ai == vcs[0] or ai == vcs[1]) and !self.has_key?(:version_control)
-	    self[:version_control] = vcs[0][2..-1]
-	  end
-	end
+        version_control_systems.each do |vcs|
+          if (ai == vcs[0] or ai == vcs[1]) and !self.has_key?(:version_control)
+            self[:version_control] = vcs[0][2..-1]
+          end
+        end
       end
     end
   end
@@ -130,6 +135,7 @@ class VersionControl
   def self.clone(url, version_control = nil)
     if "svn" == version_control
       `git svn clone #{url}`
+      Message.warning "Converting from svn. This may take a long time."
     else
       `git clone #{url}`
     end
@@ -138,7 +144,7 @@ end
 
 options = Options.new(ARGV)
 supported_version_control_systems = [
-#   "svn" # Not ready yet.
+  "svn"
 ]
 
 if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) and !options.has_key?(:url))
@@ -149,9 +155,9 @@ end
 # Check for inconsistancies
 if options.has_key?(:version_control)
   if !supported_version_control_systems.include?(o_vc = options[:version_control])
-    Message.not_implemented("#{o_vc} support")
-  elsif options.has_key?(:folder)
-    Message.usage
+    Message.not_implemented "#{o_vc} support"
+  elsif options.has_key? :folder
+    Message.not_implemented "#{o_vc} history from folders"
   end
   exit
 end
@@ -161,7 +167,7 @@ Dir.chdir("/tmp")
 begin
   if options.has_key?(:url)
     Message.downloading
-    if "" != git_dir = VersionControl.clone(options[:url], options[:version_control])
+    if "" != git_dir = VersionControl.clone(options[:url], options[:version_control]).split("\n")[0]
       tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
     else
       exit
@@ -210,7 +216,7 @@ Dir.chdir(git_dir) do
         system("echo \"Error processing commit #{commit}.\" >> analizo.log 2>> analizo.log")
         system("echo \"Analizo out:\" >> analizo.log 2>> analizo.log")
         system("analizo-metrics . >> analizo.log 2>> analizo.log")
-	system("echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log")
+        system("echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log")
         system("echo \"Doxyparse out:\" >> doxyparse.log 2>> doxyparse.log")
         system("doxyparse . >> doxyparse.log 2>> doxyparse.log")
         error_counter +=1
@@ -236,4 +242,8 @@ Dir.chdir(git_dir) do
   FileUtils.cp("analizo.log", logs_dir)
   FileUtils.cp("doxyparse.log", logs_dir)
 end
-FileUtils.rm_r(proj_name, :force => true)
+if options[:keep_temporary_folder]
+  Message.warning "The temporary folder (/tmp/#{proj_name}) was kept."
+else
+  FileUtils.rm_r(proj_name, :force => true)
+end
