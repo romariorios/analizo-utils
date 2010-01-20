@@ -156,10 +156,11 @@ end
 if options.has_key?(:version_control)
   if !supported_version_control_systems.include?(o_vc = options[:version_control])
     Message.not_implemented "#{o_vc} support"
+    exit
   elsif options.has_key? :folder
     Message.not_implemented "#{o_vc} history from folders"
+    exit
   end
-  exit
 end
 
 previous_dir = Dir.pwd
