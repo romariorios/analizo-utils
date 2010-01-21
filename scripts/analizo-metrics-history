@@ -56,7 +56,7 @@ end
 
 class AnalizoRunner
   def self.metrics(commit)
-    system("git checkout #{commit} > /dev/null 2>> git.log")
+    system "git checkout #{commit} > /dev/null 2>> git.log"
     if "" == yaml_metrics = `analizo-metrics . 2> /dev/null` then
       false
     else
@@ -83,11 +83,46 @@ class AnalizoRunner
 end
 
 class Message
+  class Commit
+    def self.count(c)
+      if c == 0 then
+	puts "No relevant commits to process."
+      else
+	print "Processing " 
+	if c == 1 then
+	  puts "one commit"
+	else
+	  puts "#{c} commits"
+	end
+      end
+    end
+    def self.failed
+      print "E"
+    end
+    def self.passed
+      print "."
+    end
+  end
   def self.done
     puts "Done."
   end
   def self.downloading
     puts "Downloading the project..."
+  end
+  def self.error_count(c)
+    if c == 0 then
+      puts "\nDone.\n"
+    else
+      if c == 1 then
+        print "\nOne error"
+      else
+        print "\n#{c} errors"
+      end
+      puts " ocurred. Check analizo.log and doxyparse.log for more details.\n"
+    end
+  end
+  def self.info(msg)
+    puts msg
   end
   def self.fatal(msg)
     puts "Fatal: #{msg}"
@@ -189,62 +224,44 @@ rescue Grit::NoSuchPathError
   Message.fatal("The temporary folder couldn't be created.")
 end
 Dir.chdir(git_dir) do
-  system("echo \"Log opened at: #{Time.now}\" >> git.log")
-  system("echo \"Log opened at: #{Time.now}\" >> analizo.log")
-  system("echo \"Log opened at: #{Time.now}\" >> doxyparse.log")
-  system("git checkout master > /dev/null 2>> git.log")
+  system "echo \"Log opened at: #{Time.now}\" >> git.log"
+  system "echo \"Log opened at: #{Time.now}\" >> analizo.log"
+  system "echo \"Log opened at: #{Time.now}\" >> doxyparse.log"
+  system "git checkout master > /dev/null 2>> git.log"
 
   File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
     file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
     wl = tree.wanted_list
-    if wl.size == 0 then
-      puts "No relevant commits to proccess"
-    else
-      print "Processing " 
-      if wl.size == 1 then
-        puts "one commit"
-      else
-        puts "#{wl.size} commits..."
-      end
-    end
+    Message::Commit.count(wl.size)
     error_counter = 0
     wl.each do |commit|
       if mcsv = AnalizoRunner.metricsCSV(commit) then
         file.puts mcsv
-        print "."
+        Message::Commit.passed
       else
-        print "E"
-        system("echo \"Error processing commit #{commit}.\" >> analizo.log 2>> analizo.log")
-        system("echo \"Analizo out:\" >> analizo.log 2>> analizo.log")
-        system("analizo-metrics . >> analizo.log 2>> analizo.log")
-        system("echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log")
-        system("echo \"Doxyparse out:\" >> doxyparse.log 2>> doxyparse.log")
-        system("doxyparse . >> doxyparse.log 2>> doxyparse.log")
+        Message::Commit.failed
+        system "echo \"Error processing commit #{commit}.\" >> analizo.log 2>> analizo.log"
+        system "echo \"Analizo out:\" >> analizo.log 2>> analizo.log"
+        system "analizo-metrics . >> analizo.log 2>> analizo.log"
+        system "echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log"
+        system "echo \"Doxyparse out:\" >> doxyparse.log 2>> doxyparse.log"
+        system "doxyparse . >> doxyparse.log 2>> doxyparse.log"
         error_counter +=1
       end
     end
-    if error_counter == 0 then
-      puts "\nDone.\n"
-    else
-      if error_counter == 1 then
-        print "\nOne error"
-      else
-        print "\n#{error_counter} errors"
-      end
-      puts " ocurred. Check analizo.log and doxyparse.log for more details.\n"
-    end
-    system("git checkout master > /dev/null 2>> git.log")
+    Message.error_count error_counter
+    system "git checkout master > /dev/null 2>> git.log"
   end
-  system("echo \"Log closed at: #{Time.now}\" >> git.log")
-  system("echo \"Log closed at: #{Time.now}\" >> analizo.log")
-  system("echo \"Log closed at: #{Time.now}\" >> doxyparse.log")
+  system "echo \"Log closed at: #{Time.now}\" >> git.log"
+  system "echo \"Log closed at: #{Time.now}\" >> analizo.log"
+  system "echo \"Log closed at: #{Time.now}\" >> doxyparse.log"
   Dir.mkdir(logs_dir = previous_dir+"/#{time_start_str}-#{proj_name}-logs")
-  FileUtils.cp("git.log", logs_dir)
-  FileUtils.cp("analizo.log", logs_dir)
-  FileUtils.cp("doxyparse.log", logs_dir)
+  FileUtils.cp "git.log", logs_dir
+  FileUtils.cp "analizo.log", logs_dir
+  FileUtils.cp "doxyparse.log", logs_dir
 end
 if options[:keep_temporary_folder]
   Message.warning "The temporary folder (/tmp/#{proj_name}) was kept."
 else
-  FileUtils.rm_r(proj_name, :force => true)
+  FileUtils.rm_r proj_name, :force => true
 end
