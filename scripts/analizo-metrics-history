@@ -133,6 +133,7 @@ class Message
   end
   def self.usage
     puts "Usage:\n   #{$PROGRAM_NAME} repository-url\n   #{$PROGRAM_NAME} -f repository-folder\n   Command-line options:\n     -s or --svn : The url passed is a Subversion repository.\n     -k or --keeptmp : Keep the temporary folder used to take the metrics (recommended for --svn)."
+    exit
   end
   def self.warning(msg)
     puts "Warning: #{msg}"
@@ -185,17 +186,14 @@ supported_version_control_systems = [
 
 if (options.has_key?(:folder) and options.has_key?(:url)) or (!options.has_key?(:folder) and !options.has_key?(:url))
   Message.usage
-  exit
 end
 
 # Check for inconsistancies
 if options.has_key?(:version_control)
   if !supported_version_control_systems.include?(o_vc = options[:version_control])
     Message.not_implemented "#{o_vc} support"
-    exit
   elsif options.has_key? :folder
     Message.not_implemented "#{o_vc} history from folders"
-    exit
   end
 end
 
