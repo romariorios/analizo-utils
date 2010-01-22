@@ -125,7 +125,8 @@ class Message
     puts msg
   end
   def self.fatal(msg)
-    puts "Fatal: #{msg}"
+    puts "fatal: #{msg}"
+    exit
   end
   def self.not_implemented(feature = "feature")
     print "Sorry, #{feature} not implemented yet."
@@ -219,7 +220,6 @@ begin
   end
 rescue Grit::InvalidGitRepositoryError
   Message.fatal("Not a git repository.")
-  exit
 rescue Grit::NoSuchPathError
   Message.fatal("The temporary folder couldn't be created.")
 end
