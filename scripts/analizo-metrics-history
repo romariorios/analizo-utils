@@ -230,7 +230,7 @@ Dir.chdir(git_dir) do
   system "git checkout master > /dev/null 2>> git.log"
 
   File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
-    file.puts "commit_id,nearest_chngend_ancestral_id,author,e-mail,average_coupiling,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
+    file.puts "commit_id,nearest_changed_ancestral_id,author,e-mail,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
     wl = tree.wanted_list
     Message::Commit.count(wl.size)
     error_counter = 0
