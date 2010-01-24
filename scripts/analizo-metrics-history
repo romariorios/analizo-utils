@@ -8,7 +8,9 @@
 #        metrics-history -f repository-folder
 #
 
-require 'metrics-history/AnalizoRunner'
-require 'metrics-history/Options'
+Dir.chdir('metrics-history') do
+  require 'AnalizoRunner'
+  require 'Options'
+end
 
 AnalizoRunner.metrics_history(Options.new(ARGV))
