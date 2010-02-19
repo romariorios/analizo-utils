@@ -1,4 +1,5 @@
 require 'Grit::Commit-extension'
+require 'Log'
 require 'Message'
 require 'VersionControl'
 require 'defs'
@@ -15,7 +16,11 @@ class AnalizoRunner
       YAML.load_stream(yaml_metrics).documents
     end
   end
-  def self.metrics_history(options) # That's actually the main program
+  
+  # This is actually the main program. It should not be here, not this way,
+  # but I will keep it for a while, until I either refactor it and really 
+  # make it fit to this class (namespace?) or find a new class for it.
+  def self.metrics_history(options)
     previous_dir = Dir.pwd
     Dir.chdir("/tmp")
     begin
@@ -40,42 +45,24 @@ class AnalizoRunner
     rescue Grit::NoSuchPathError
       Message.fatal("The temporary folder couldn't be created.")
     end
-    Dir.chdir(git_dir) do
-      system "echo \"Log opened at: #{Time.now}\" >> git.log"
-      system "echo \"Log opened at: #{Time.now}\" >> analizo.log"
-      system "echo \"Log opened at: #{Time.now}\" >> doxyparse.log"
-      system "git checkout master > /dev/null 2>> git.log"
-      
+    proj_log = Log.new(proj_name)
+    Dir.chdir(git_dir) do      
       File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
         file.puts "commit_id,nearest_changed_ancestral_id,author,e-mail,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
         wl = tree.wanted_list
-        Message::Commit.count(wl.size)
+        Message::Commit.count wl.size
         error_counter = 0
         wl.each do |commit|
-          if mcsv = AnalizoRunner.metricsCSV(commit) then
+          if mcsv = metricsCSV(commit) then
             file.puts mcsv
             Message::Commit.passed
           else
             Message::Commit.failed
-            system "echo \"Error processing commit #{commit}.\" >> analizo.log 2>> analizo.log"
-            system "echo \"Analizo out:\" >> analizo.log 2>> analizo.log"
-            system "analizo-metrics . >> analizo.log 2>> analizo.log"
-            system "echo \"Error processing commit #{commit}.\" >> doxyparse.log 2>> doxyparse.log"
-            system "echo \"Doxyparse out:\" >> doxyparse.log 2>> doxyparse.log"
-            system "doxyparse . >> doxyparse.log 2>> doxyparse.log"
-            error_counter +=1
+            proj_log.error(commit.id)
           end
         end
-        Message.error_count error_counter
-        system "git checkout master > /dev/null 2>> git.log"
+        Message.error_count proj_log.errors
       end
-      system "echo \"Log closed at: #{Time.now}\" >> git.log"
-      system "echo \"Log closed at: #{Time.now}\" >> analizo.log"
-      system "echo \"Log closed at: #{Time.now}\" >> doxyparse.log"
-      Dir.mkdir(logs_dir = previous_dir+"/#{time_start_str}-#{proj_name}-logs")
-      FileUtils.cp "git.log", logs_dir
-      FileUtils.cp "analizo.log", logs_dir
-      FileUtils.cp "doxyparse.log", logs_dir
     end
     if options[:keep_temporary_folder]
       Message.warning "The temporary folder (/tmp/#{proj_name}) was kept."
