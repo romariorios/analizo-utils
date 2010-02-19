@@ -25,7 +25,7 @@ class Log
         system "echo #{doxyparse} >> doxyparse.log"
       end
     end
-    @errors
+    @errors += 1
   end
   def close!
     if @open
