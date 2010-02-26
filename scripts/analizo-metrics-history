@@ -8,7 +8,8 @@
 #        metrics-history -f repository-folder
 #
 
-Dir.chdir('metrics-history') do
+dir = "/#{`which #{$PROGRAM_NAME}`.split("/")[0..-2].join("/")}"
+Dir.chdir("#{dir}/metrics-history") do
   require 'AnalizoRunner'
   require 'Options'
 end

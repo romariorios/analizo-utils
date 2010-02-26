@@ -45,7 +45,10 @@ class AnalizoRunner
     rescue Grit::NoSuchPathError
       Message.fatal("The temporary folder couldn't be created.")
     end
-    proj_log = Log.new(proj_name)
+    proj_log = nil
+    Dir.chdir previous_dir do
+      proj_log = Log.new(proj_name)
+    end
     Dir.chdir(git_dir) do      
       File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
         file.puts "commit_id,nearest_changed_ancestral_id,author,e-mail,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"

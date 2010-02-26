@@ -4,7 +4,7 @@ class Log
     @open = true
     @errors = 0
     @time_start_str = (@time_start = Time.now).strftime('%Y%m%d%H%M%S')
-    Dir.mkdir(@logs_dir = "#{@time_start_str}-#{@project = project}-logs")
+    Dir.mkdir(@logs_dir = Dir.pwd+"/#{@time_start_str}-#{@project = project}-logs")
     Dir.chdir(@logs_dir) do
       system "echo \"Log opened at: #{@time_start}\" >> git.log"
       system "echo \"Log opened at: #{@time_start}\" >> analizo.log"
