@@ -40,17 +40,13 @@ class Grit::Commit
     end
   end
   def wanted_list
-    commit = self.wanted? ? self : self.previous_wanted
-    if commit
-      result = []
-      while commit
-        result << commit
-        commit = commit.previous_wanted
-      end
-      result
-    else
-      []
+    all_commits = [self]
+    current_commits = self.parents
+    while !current_commits.empty?
+      all_commits += current_commits
+      current_commits = current_commits.map{ |cc| cc.parents }.flatten.compact.reject{ |pr| all_commits.map{ |ac| ac.id }.include? pr.id }
     end
+    all_commits.select{ |c| c.wanted? }
   end
 end
 
