@@ -15,6 +15,19 @@ require 'fileutils'
 
 FILTER = /\.(c|h|cpp|cxx|cc|hpp|java)$/
 
+# From https://gist.github.com/9eb85bdeea171742665a
+class Array
+  def uniq_by(&blk)
+    transforms = []
+    self.select do |el|
+      should_keep = !transforms.include?(t=blk[el])
+      transforms << t
+      should_keep
+    end
+  end
+end
+# End
+
 class Grit::Commit
   def merge?
     self.parents.size > 1
@@ -44,7 +57,7 @@ class Grit::Commit
     current_commits = self.parents
     while !current_commits.empty?
       all_commits += current_commits
-      current_commits = current_commits.map{ |cc| cc.parents }.flatten.compact.reject{ |pr| all_commits.map{ |ac| ac.id }.include? pr.id }
+      current_commits = current_commits.map{ |cc| cc.parents }.flatten.compact.reject{ |pr| all_commits.map{ |ac| ac.id }.include? pr.id }.uniq_by{ |cc| cc.id }
     end
     all_commits.select{ |c| c.wanted? }
   end
