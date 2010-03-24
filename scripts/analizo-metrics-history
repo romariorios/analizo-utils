@@ -40,6 +40,14 @@ class Grit::Commit
     matches = (files.any? { |path| path =~ FILTER })
     !merge? && matches 
   end
+  def previous_wanted_list
+    if parentless
+      []
+    else
+      previous_list = self.parents
+      previous_list.map{ |pr| if !pr.wanted?; pr.previous_wanted_list; else; pr; end }.flatten
+    end
+  end
   def wanted_list
     all_commits = [self]
     current_commits = self.parents
@@ -65,9 +73,7 @@ class AnalizoRunner
     if metr then
       csv_string = ""
       csv_string << commit.id; csv_string << ","
-      if pa = commit.parents[0] then
-        csv_string << commit.parents[0].id
-      end
+      csv_string << commit.previous_wanted_list.map{ |w| w.id }.join(",").inspect
       csv_string << ","
       csv_string << commit.author.name.inspect; csv_string << ","
       csv_string << commit.author.email; csv_string << ","
