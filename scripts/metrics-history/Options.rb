@@ -4,7 +4,7 @@ require 'Message'
 class Options < Hash
   def initialize(args = [])
     parse_by_command_line_args(args)
-    if (has_key?(:folder) and has_key?(:url)) or (!has_key?(:folder) and !has_key?(:url))
+    if (self[:folder] != :none and self[:url] != :none) or (self[:folder] == :none and self[:url] == :none)
       Message.usage
     end
     if has_key?(:version_control)
@@ -29,6 +29,11 @@ class Options < Hash
             self[:version_control] = vcs[0][2..-1]
           end
         end
+      end
+      if self.has_key?(:folder)
+        self[:url] = :none
+      elsif self.has_key?(:url)
+        self[:folder] = :none
       end
     end
   end

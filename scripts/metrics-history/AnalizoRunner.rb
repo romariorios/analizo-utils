@@ -38,7 +38,7 @@ class AnalizoRunner
     previous_dir = Dir.pwd
     Dir.chdir("/tmp")
     begin
-      if options.has_key?(:url)
+      if options[:url] != :none
         Message.downloading
         if "" != git_dir = VersionControl.clone(options[:url], options[:version_control]).split("\n")[0]
           tree = Grit::Repo.new(git_dir = git_dir.split[5]+"..").commits.first
@@ -47,7 +47,7 @@ class AnalizoRunner
         end
         proj_name = git_dir.split("/")[-3]
         Message.done
-      elsif options.has_key?(:folder)
+      elsif options[:folder] != :none
         proj_name = Dir.chdir(git_dir = options[:folder]) do
           Dir.pwd.split("/")[-1]
         end
