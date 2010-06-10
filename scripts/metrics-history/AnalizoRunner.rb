@@ -13,7 +13,21 @@ class AnalizoRunner
     if "" == yaml_metrics = `analizo-metrics . 2> /dev/null` then
       false
     else
-      YAML.load_stream(yaml_metrics).documents
+      metr = YAML.load_stream(yaml_metrics).documents
+      commit_info = {
+        :id => commit.id,
+        :author => commit.author.name.inspect,
+        :author_email => commit.author.email,
+        :changed_files => `git show --pretty=format: --name-only #{commit.id}`.split.join(',').inspect,
+        :date => commit.authored_date.rfc2822.inspect
+      }
+      if pa = commit.previous_wanted
+        commit_info[:previous_wanted] = commit.previous_wanted.id
+      else
+        commit_info[:previous_wanted] = ""
+      end
+      metr << commit_info
+      metr
     end
   end
   
@@ -34,7 +48,7 @@ class AnalizoRunner
         proj_name = git_dir.split("/")[-3]
         Message.done
       elsif options.has_key?(:folder)
-        proj_name = Dir.chdir(git_dir = previous_dir+"/"+options[:folder]) do
+        proj_name = Dir.chdir(git_dir = options[:folder]) do
           Dir.pwd.split("/")[-1]
         end
         FileUtils.cp_r git_dir, "/tmp/#{proj_name}"
@@ -49,45 +63,41 @@ class AnalizoRunner
     Dir.chdir previous_dir do
       proj_log = Log.new(proj_name)
     end
-    Dir.chdir(git_dir) do      
-      File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
-        file.puts "commit_id,nearest_changed_ancestral_id,author,e-mail,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
-        wl = tree.wanted_list
-        Message::Commit.count wl.size
-        error_counter = 0
-        wl.each do |commit|
-          if mcsv = metricsCSV(commit) then
-            file.puts mcsv
-            Message::Commit.passed
-          else
-            Message::Commit.failed
-            proj_log.error(commit.id)
-          end
+    mh = []
+    Dir.chdir(git_dir) do
+      wl = tree.wanted_list
+      Message::Commit.count wl.size
+      error_counter = 0
+      wl.each do |commit|
+        if metr = metrics(commit) then
+          mh << metr
+          Message::Commit.passed
+        else
+          Message::Commit.failed
+          proj_log.error(commit.id)
         end
-        Message.error_count proj_log.errors
       end
+      Message.error_count proj_log.errors
     end
     if options[:keep_temporary_folder]
       Message.warning "The temporary folder (/tmp/#{proj_name}) was kept."
     else
       FileUtils.rm_r proj_name, :force => true
     end
+    [mh, proj_name]
   end
-  def self.metricsCSV(commit) # This shoudn't really be here, but I'm still deciding where to put it.
-    metr = metrics(commit)
+  def self.metrics_to_csv_line(metr) # This shoudn't really be here, but I'm still deciding where to put it.
+    commit = metr[-1]
     if metr then
       csv_string = ""
-      csv_string << commit.id; csv_string << ","
-      if pa = commit.previous_wanted then
-        csv_string << commit.previous_wanted.id
-      end
-      csv_string << ","
-      csv_string << commit.author.name.inspect; csv_string << ","
-      csv_string << commit.author.email; csv_string << ","
+      csv_string << commit[:id]; csv_string << ","
+      csv_string << commit[:previous_wanted]; csv_string << ","
+      csv_string << commit[:author]; csv_string << ","
+      csv_string << commit[:author_email]; csv_string << ","
       
       csv_string << metr[0].keys.sort.map{|key| metr[0][key]}.join(','); csv_string << ","
-      csv_string << `git show --pretty=format: --name-only #{commit.id}`.split.join(',').inspect; csv_string << ","
-      csv_string << commit.authored_date.rfc2822.inspect
+      csv_string << commit[:changed_files]; csv_string << ","
+      csv_string << commit[:date]
     end
   end
 end
