@@ -19,25 +19,44 @@ require 'Qt4'
 class QtAnalizoMetricsHistory < Qt::Widget
   slots 'analysis()'
   slots 'select_dir()'
+  slots 'save_to_file()'
+  
   def initialize(parent = nil)
     super
     @folder_line_edit = Qt::LineEdit.new
-    @button_calculate = Qt::PushButton.new("Calculate")
+    @button_calculate = Qt::PushButton.new("Extract")
     @metricsfor_text = Qt::Label.new("Insert a git directory to extract the metrics from.")
-    @button_dir = Qt::PushButton.new("Select directory")
+    @button_dir = Qt::PushButton.new("Directory...")
     @metrics_table_view = Qt::TableView.new
     @metrics_table_model = Qt::StandardItemModel.new(@metrics_table_view)
     @upper_layout = Qt::HBoxLayout.new
     @main_layout = Qt::VBoxLayout.new
     
-    @dir = Dir.pwd
-    metrics = ["commit_id", "nearest_changed_ancestral_id", "author", "e-mail", "average_cbo", "average_lcom4", "cof", "sum_classes", "sum_nom", "sum_npm", "sum_npv", "total_loc", "changed_files", "date"]
-    @metrics_table_model.setHorizontalHeaderLabels(metrics)
+    @folder_line_edit.setText Dir.pwd
+    @fields = [
+      # -1: Commit info
+      # 0: Metric
+      [:id, -1],
+      [:previous_wanted, -1],
+      [:author, -1],
+      [:author_email, -1]
+    ]
+    AnalizoRunner.metric_list.map{ |metr| [metr, 0] }.each{ |metr| @fields << metr }
+    [
+      ["total_loc", 0],
+      [:changed_files, -1],
+      [:date, -1]
+    ].each{ |metr| @fields << metr }
+    puts "Fields: "
+    puts @fields.inspect
+    @metrics_table_model.setHorizontalHeaderLabels(@fields.map{ |f| f[0].to_s })
     @metrics_table_view.setModel(@metrics_table_model)
     
     connect(@button_calculate, SIGNAL('clicked()'), self, SLOT('analysis()'))
+    connect(@button_dir, SIGNAL('clicked()'), self, SLOT('select_dir()'))
     
     @upper_layout.addWidget(@folder_line_edit)
+    @upper_layout.addWidget(@button_dir)
     @upper_layout.addWidget(@button_calculate)
     @main_layout.addLayout(@upper_layout)
     @main_layout.addWidget(@metricsfor_text)
@@ -46,23 +65,28 @@ class QtAnalizoMetricsHistory < Qt::Widget
     resize(800, 480)
   end
   def analysis
+    puts "Entered new thread"
+    @folder_line_edit.setEnabled(false); @button_calculate.setEnabled(false); @button_dir.setEnabled(false)
     @metrics = AnalizoRunner.metrics_history({ :folder => @folder_line_edit.text, :url => :none })
+    @folder_line_edit.setEnabled(true); @button_calculate.setEnabled(true); @button_dir.setEnabled(true)
     @metricsfor_text.setText("Metrics for project #{@metrics[1]}:")
     @metrics[0][0..-2].each_with_index do |metric, row|
-      metric[0].each_with_index do |m, column|
-        i = Qt::StandardItem.new
-        i.setText(m)
-        @metrics_table_model.setItem(row, column+4, i)
+      @fields.each_with_index do |f, i|
+        fi = Qt::StandardItem.new
+        fi.setText(metric[f[1]][f[0]].to_s)
+        fi.setEditable(false)
+        fi.setSelectable(false)
+        @metrics_table_model.setItem(row, i, fi)
       end
     end
   end
   def select_dir
-    
+    @folder_line_edit.setText Qt::FileDialog.getExistingDirectory(self, "Select git repository folder", @folder_line_edit.text)
   end
   def save_to_file
-    File.open(previous_dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
+    File.open(@dir+"/#{time_start_str = Time.now.strftime('%Y%m%d%H%M%S')}-#{proj_name}-metrics.csv", 'w') do |file|
       file.puts "commit_id,nearest_changed_ancestral_id,author,e-mail,average_cbo,average_lcom4,cof,sum_classes,sum_nom,sum_npm,sum_npv,sum_tloc,changed_files,date\n"
-      analysis[0].each do |metr|
+      @metrics[0][0..-2].each do |metr|
         file.puts AnalizoRunner.metrics_to_csv_line(metr)
       end
     end

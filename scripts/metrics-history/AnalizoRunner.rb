@@ -16,10 +16,10 @@ class AnalizoRunner
       metr = YAML.load_stream(yaml_metrics).documents
       commit_info = {
         :id => commit.id,
-        :author => commit.author.name.inspect,
+        :author => commit.author.name,
         :author_email => commit.author.email,
-        :changed_files => `git show --pretty=format: --name-only #{commit.id}`.split.join(',').inspect,
-        :date => commit.authored_date.rfc2822.inspect
+        :changed_files => `git show --pretty=format: --name-only #{commit.id}`.split.join(','),
+        :date => commit.authored_date.rfc2822
       }
       if pa = commit.previous_wanted
         commit_info[:previous_wanted] = commit.previous_wanted.id
@@ -92,13 +92,16 @@ class AnalizoRunner
       csv_string = ""
       csv_string << commit[:id]; csv_string << ","
       csv_string << commit[:previous_wanted]; csv_string << ","
-      csv_string << commit[:author]; csv_string << ","
+      csv_string << commit[:author].inspect; csv_string << ","
       csv_string << commit[:author_email]; csv_string << ","
       
       csv_string << metr[0].keys.sort.map{|key| metr[0][key]}.join(','); csv_string << ","
-      csv_string << commit[:changed_files]; csv_string << ","
-      csv_string << commit[:date]
+      csv_string << commit[:changed_files].inspect; csv_string << ","
+      csv_string << commit[:date].inspect
     end
+  end
+  def self.metric_list
+    `analizo-metrics -l`.split("\n").map{ |l| l.split[0]+"_average" }
   end
 end
 
