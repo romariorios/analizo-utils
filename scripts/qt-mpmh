@@ -1,0 +1,51 @@
+#!/usr/bin/ruby
+
+dir = "/#{`which #{$PROGRAM_NAME}`.split("/")[0..-2].join("/")}"
+require 'active_record'
+require 'yaml'
+Dir.chdir("#{dir}/multi-project-metrics-history-db") do
+  ActiveRecord::Base.establish_connection(YAML::load(File.open('config/database.yml')))
+  Dir.chdir("app/models") do
+    require 'author'
+    require 'commit'
+    require 'metric'
+    require 'project'
+  end
+end 
+Dir.chdir("#{dir}/metrics-history") do
+  require 'AnalizoRunner'
+end
+require 'Qt4'
+
+class QtMultiProjectMetricsHistory < Qt::MainWindow
+  slots :add
+  
+  def initialize(parent = nil)
+    super
+    @project_line_edit = Qt::LineEdit.new
+    @add_button = Qt::PushButton.new "Add"
+    @project_list_view = Qt::ListView.new
+    @project_list_model = Qt::StringListModel.new
+    @upper_layout = Qt::HBoxLayout.new
+    @main_layout = Qt::VBoxLayout.new
+    
+    projects = Project.find(:all).map{ |p| p.name }
+    @project_list_model.setStringList projects
+    @project_list_view.setModel @project_list_model
+    
+    connect @add_button, SIGNAL(:clicked), self, SLOT(:add)
+    
+    [
+      @project_line_edit,
+      @add_button
+    ].each{ |w| @upper_layout.addWidget w }
+    @main_layout.addLayout @upper_layout
+    @main_layout.addWidget @project_list_view
+    resize 800, 700
+  end
+  def add
+    Project.new(:name => @project_line_edit.text).save
+    projects = Project.find(:all).map{ |p| p.name }
+    @project_list_model.setStringList projects
+  end
+end

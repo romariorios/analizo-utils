@@ -1,17 +1,13 @@
 #!/usr/bin/ruby
-# metrics-history
-# Generates the metrics of the whole history of an application.
+# qt-analizo-metrics-history
+# Qt Frontend for analizo-metrics-history
 # Antônio Terceiro (terceiro@dcc.ufba.br)
 # Luiz Romário Santana Rios (luizromario@gmail.com)
-# 
-# Usage: metrics-history repository-url
-#        metrics-history -f repository-folder
 #
 
 dir = "/#{`which #{$PROGRAM_NAME}`.split("/")[0..-2].join("/")}"
 Dir.chdir("#{dir}/metrics-history") do
   require 'AnalizoRunner'
-  require 'Options'
 end
 
 require 'Qt4'
