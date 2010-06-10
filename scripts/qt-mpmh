@@ -1,51 +1,77 @@
 #!/usr/bin/ruby
 
 dir = "/#{`which #{$PROGRAM_NAME}`.split("/")[0..-2].join("/")}"
-require 'active_record'
+# require 'active_record'
 require 'yaml'
-Dir.chdir("#{dir}/multi-project-metrics-history-db") do
-  ActiveRecord::Base.establish_connection(YAML::load(File.open('config/database.yml')))
-  Dir.chdir("app/models") do
-    require 'author'
-    require 'commit'
-    require 'metric'
-    require 'project'
-  end
-end 
+# Dir.chdir("#{dir}/multi-project-metrics-history-db") do
+#   ActiveRecord::Base.establish_connection(YAML::load(File.open('config/database.yml')))
+#   Dir.chdir("app/models") do
+#     require 'author'
+#     require 'commit'
+#     require 'metric'
+#     require 'project'
+#   end
+# end 
 Dir.chdir("#{dir}/metrics-history") do
   require 'AnalizoRunner'
 end
 require 'Qt4'
+require 'MetricsAnalyzer'
 
-class QtMultiProjectMetricsHistory < Qt::MainWindow
-  slots :add
+class ProjectInfo < Qt::Widget
+  slots 'project(const QModelIndex&)'
+  attr_accessor :name
   
   def initialize(parent = nil)
     super
-    @project_line_edit = Qt::LineEdit.new
-    @add_button = Qt::PushButton.new "Add"
-    @project_list_view = Qt::ListView.new
-    @project_list_model = Qt::StringListModel.new
-    @upper_layout = Qt::HBoxLayout.new
-    @main_layout = Qt::VBoxLayout.new
+    @name = Qt::Label.new "Click a project"
+    @new_project_button = Qt::PushButton.new "Analyze a new project"
+    @layout = Qt::VBoxLayout.new
     
-    projects = Project.find(:all).map{ |p| p.name }
+    @name.setFont(Qt::Font.new("Sans", 16, Qt::Font::Bold))
+    
+    connect parent, SIGNAL('project_clicked(const QModelIndex&)'), self, SLOT('project(const QModelIndex&)')
+    
+    @layout.addWidget @name
+    setLayout @layout
+  end
+  def project(proj)
+    puts proj.data.toString
+    @name.setText proj.data.toString
+    # Here would go DB access functions
+  end
+  def new_project
+    @ma = MetricsAnalyzer.new
+  end
+end
+
+class QtMultiProjectMetricsHistory < Qt::MainWindow
+  signals 'project_clicked(const QModelIndex&)'
+  
+  def initialize(parent = nil)
+    super
+    @project_list_view = Qt::ListView.new
+    @project_list_model = Qt::StringListModel.new @project_list_view
+    @project_dock = Qt::DockWidget.new "Projects"
+    @project_operations = ProjectInfo.new self
+    
+    projects = ["Amarok", "grit", "ristretto", "Cadastro de Restaurantes"] # Project.find(:all).map{ |p| p.name }
     @project_list_model.setStringList projects
     @project_list_view.setModel @project_list_model
     
-    connect @add_button, SIGNAL(:clicked), self, SLOT(:add)
+    # connect @add_button, SIGNAL(:clicked), self, SLOT(:add)
+    connect @project_list_view, SIGNAL('clicked(const QModelIndex&)'), self, SIGNAL('project_clicked(const QModelIndex&)')
     
-    [
-      @project_line_edit,
-      @add_button
-    ].each{ |w| @upper_layout.addWidget w }
-    @main_layout.addLayout @upper_layout
-    @main_layout.addWidget @project_list_view
-    resize 800, 700
-  end
-  def add
-    Project.new(:name => @project_line_edit.text).save
-    projects = Project.find(:all).map{ |p| p.name }
-    @project_list_model.setStringList projects
+    @project_dock.setWidget @project_operations
+    setCentralWidget @project_list_view
+    addDockWidget Qt::RightDockWidgetArea, @project_dock, Qt::Vertical
+    resize 900, 550
   end
 end
+
+a = Qt::Application.new(ARGV)
+
+w = QtMultiProjectMetricsHistory.new
+w.show
+
+a.exec

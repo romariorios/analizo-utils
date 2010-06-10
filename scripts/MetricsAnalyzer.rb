@@ -1,20 +1,14 @@
-#!/usr/bin/ruby
-# qt-analizo-metrics-history
-# Qt Frontend for analizo-metrics-history
-# Antônio Terceiro (terceiro@dcc.ufba.br)
-# Luiz Romário Santana Rios (luizromario@gmail.com)
-#
-
 dir = "/#{`which #{$PROGRAM_NAME}`.split("/")[0..-2].join("/")}"
 Dir.chdir("#{dir}/metrics-history") do
   require 'AnalizoRunner'
 end
 
-require 'Qt4'
-
-class QtAnalizoMetricsHistory < Qt::Widget
+class MetricsAnalyzer < Qt::Widget
   slots :analysis, :select_dir, :save_to_file
   slots 'change_where_from(int)'
+  signals :analysis_finished
+  
+  attr_reader :metrics
   
   def initialize(parent = nil)
     super
@@ -77,6 +71,7 @@ class QtAnalizoMetricsHistory < Qt::Widget
         @metrics_table_model.setItem(row, i, fi)
       end
     end
+    emit :analysis_finished
   end
   def select_dir
     @location_line_edit.setText Qt::FileDialog.getExistingDirectory(self, "Select git repository folder...", @location_line_edit.text)
@@ -104,12 +99,4 @@ class QtAnalizoMetricsHistory < Qt::Widget
     end
   end
 end
-
-app = Qt::Application.new(ARGV)
-
-mainwin = QtAnalizoMetricsHistory.new
-mainwin.show
-
-app.exec
-
 
