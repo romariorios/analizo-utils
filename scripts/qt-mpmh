@@ -19,7 +19,7 @@ require 'Qt4'
 require 'MetricsAnalyzer'
 
 class ProjectInfo < Qt::Widget
-  slots 'project(const QModelIndex&)'
+  slots 'project(const QModelIndex&)', :new_project
   attr_accessor :name
   
   def initialize(parent = nil)
@@ -31,17 +31,21 @@ class ProjectInfo < Qt::Widget
     @name.setFont(Qt::Font.new("Sans", 16, Qt::Font::Bold))
     
     connect parent, SIGNAL('project_clicked(const QModelIndex&)'), self, SLOT('project(const QModelIndex&)')
+    connect @new_project_button, SIGNAL(:clicked), self, SLOT(:new_project)
     
-    @layout.addWidget @name
+    [
+      @name,
+      @new_project_button
+    ].each{ |w| @layout.addWidget w }
     setLayout @layout
   end
   def project(proj)
-    puts proj.data.toString
     @name.setText proj.data.toString
     # Here would go DB access functions
   end
   def new_project
-    @ma = MetricsAnalyzer.new
+    @ma = MetricsAnalyzer.new self
+    @ma.show
   end
 end
 

@@ -3,7 +3,7 @@ Dir.chdir("#{dir}/metrics-history") do
   require 'AnalizoRunner'
 end
 
-class MetricsAnalyzer < Qt::Widget
+class MetricsAnalyzer < Qt::Dialog
   slots :analysis, :select_dir, :save_to_file
   slots 'change_where_from(int)'
   signals :analysis_finished
