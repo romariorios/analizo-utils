@@ -87,21 +87,30 @@ class AnalizoRunner
     [mh, proj_name]
   end
   def self.metrics_to_csv_line(metr) # This shoudn't really be here, but I'm still deciding where to put it.
-    commit = metr[-1]
     if metr then
-      csv_string = ""
-      csv_string << commit[:id]; csv_string << ","
-      csv_string << commit[:previous_wanted]; csv_string << ","
-      csv_string << commit[:author].inspect; csv_string << ","
-      csv_string << commit[:author_email]; csv_string << ","
-      
-      csv_string << metr[0].keys.sort.map{|key| metr[0][key]}.join(','); csv_string << ","
-      csv_string << commit[:changed_files].inspect; csv_string << ","
-      csv_string << commit[:date].inspect
+      arr = []
+      fields.each do |f|
+        arr << metr[f[1]][f[0]].inspect
+      end
+      arr.join(",")
     end
   end
-  def self.metric_list
-    `analizo-metrics -l`.split("\n").map{ |l| l.split[0]+"_average" }
+  def self.fields
+    fields_list = [
+      # -1: Commit info
+      # 0: Metric
+      [:id, -1],
+      [:previous_wanted, -1],
+      [:author, -1],
+      [:author_email, -1]
+    ]
+    `analizo-metrics -l`.split("\n").map{ |l| l.split[0]+"_average" }.map{ |metr| [metr, 0] }.each{ |metr| fields_list << metr }
+    [
+      ["total_loc", 0],
+      [:changed_files, -1],
+      [:date, -1]
+    ].each{ |metr| fields_list << metr }
+    fields_list
   end
 end
 
